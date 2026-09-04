@@ -1,3 +1,5 @@
+import galois
+
 class GF_256:
     def __init__(self, reducing_p: int, generating_p: int) -> None:
         self.reducing_p: int = reducing_p
@@ -60,16 +62,16 @@ class GF_256:
     def add(self, x: int, y: int) -> int:
         return x ^ y
 
+    def multiply(self, x: int, y: int) -> int:
+        if x == 0 or y == 0:
+            return 0
+        
+        sum = (self._GF_LOG[x] + self._GF_LOG[y]) % 255
+        return self._GF_ANTILOG[sum]
+
 # aes finite field
 gf: GF_256 = GF_256(0x11b, 3)
 
-# compare to tables 2 and 3 in  https://asmaes.sourceforge.net/rijndael/rijndaelImplementation.pdf
-for i in range(16):
-    for j in range(16):
-        print(f"{gf._GF_LOG[j + 16 * i]:02x} ", end="")
-    print("")
-
-for i in range(16):
-    for j in range(16):
-        print(f"{gf._GF_ANTILOG[j + 16 * i]:02x} ", end="")
-    print("")
+GF = galois.GF(2**8, irreducible_poly=galois.Poly.Int(0x11b))
+print(GF([0x39]) * GF([0x31]))
+print(gf.multiply(0x39, 0x31))
