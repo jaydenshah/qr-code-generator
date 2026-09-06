@@ -1,11 +1,9 @@
-import galois
-
-class GF_256:
+class GF256:
     def __init__(self, reducing_p: int, generating_p: int) -> None:
         self.reducing_p: int = reducing_p
         self.generating_p: int = generating_p
-        self._GF_ANTILOG: list[int] = [0] * 256
-        self._GF_LOG: list[int] = [0] * 256
+        self._ANTILOG: list[int] = [0] * 256
+        self._LOG: list[int] = [0] * 256
         self._populate_generator_tables()
 
     # https://en.wikipedia.org/wiki/Finite_field_arithmetic#Rijndael's_(AES)_finite_field
@@ -31,8 +29,8 @@ class GF_256:
         # x = g^i
         x: int = 1
         for i in range(255):
-            self._GF_ANTILOG[i] = x
-            self._GF_LOG[x] = i
+            self._ANTILOG[i] = x
+            self._LOG[x] = i
             x = self._multiply_slow(x, self.generating_p)
 
 
@@ -66,12 +64,5 @@ class GF_256:
         if x == 0 or y == 0:
             return 0
         
-        sum = (self._GF_LOG[x] + self._GF_LOG[y]) % 255
-        return self._GF_ANTILOG[sum]
-
-# aes finite field
-gf: GF_256 = GF_256(0x11b, 3)
-
-GF = galois.GF(2**8, irreducible_poly=galois.Poly.Int(0x11b))
-print(GF([0x39]) * GF([0x31]))
-print(gf.multiply(0x39, 0x31))
+        sum: int = (self._LOG[x] + self._LOG[y]) % 255
+        return self._ANTILOG[sum]
