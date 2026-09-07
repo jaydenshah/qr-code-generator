@@ -1,7 +1,7 @@
 class GF256:
-    def __init__(self, reducing_p: int, generating_p: int) -> None:
-        self.reducing_p: int = reducing_p
-        self.generating_p: int = generating_p
+    def __init__(self, irreducible_p: int, primitive_p: int) -> None:
+        self.irreducible_p: int = irreducible_p
+        self.primitive_p: int = primitive_p
         self._ANTILOG: list[int] = [0] * 256
         self._LOG: list[int] = [0] * 256
         self._populate_generator_tables()
@@ -21,7 +21,7 @@ class GF256:
             carry: int = x & 128
             x = (x << 1) & 0xff
             if carry:
-                x ^= self.reducing_p & 0xff
+                x ^= self.irreducible_p & 0xff
 
         return product
 
@@ -31,8 +31,7 @@ class GF256:
         for i in range(255):
             self._ANTILOG[i] = x
             self._LOG[x] = i
-            x = self._multiply_slow(x, self.generating_p)
-
+            x = self._multiply_slow(x, self.primitive_p)
 
     def print_polynomial(self, x: int) -> None:
         degrees: list[int] = []
@@ -66,3 +65,13 @@ class GF256:
         
         sum: int = (self._LOG[x] + self._LOG[y]) % 255
         return self._ANTILOG[sum]
+
+    def divide(self, x: int, y: int) -> int:
+        if y == 0:
+            raise ZeroDivisionError
+        elif y == 1:
+            return x
+
+        mult_inverse: int = self._ANTILOG[255 - self._LOG[y]]
+
+        return self.multiply(x, mult_inverse)
