@@ -79,33 +79,3 @@ class Polynomial:
 
     def mod(self, x: list[int], y: list[int]) -> list[int]:
         return self._division_alg(x, y)[1]
-
-# EVERYTHING BELOW IS TEMPORARY CODE
-def convert_polynomial_to_alpha_exponents(x: list[int]) -> list[int | None]:
-    alpha_exponents: list[int | None] = []
-    for coefficient in x:
-        if coefficient == 0:
-            alpha_exponents.append(None)
-            continue
-
-        alpha_exponents.append(GF._LOG[coefficient])
-
-    return alpha_exponents
-
-GF = GF256(0x11d, 2)
-P = Polynomial.fromGaloisField(GF)
-
-def generator(ecc: int) -> list[int]:
-    alpha_i = 1
-    g_p = [1]
-    for _ in range(ecc):
-        g_p = P.multiply(g_p, [1, alpha_i])
-        alpha_i = GF.multiply(alpha_i, GF.primitive_p)
-
-    return g_p
-
-# https://www.nayuki.io/page/creating-a-qr-code-step-by-step
-x = P.mod([0x41, 0x14, 0x86, 0x56, 0xC6, 0xC6, 0xF2, 0xC2, 0x07, 0x76, 0xF7, 0x26, 0xC6, 0x42, 0x12, 0x03, 0x13, 0x23, 0x30, 0, 0, 0, 0, 0, 0, 0], generator(7))
-
-for thing in x:
-    print(hex(thing))

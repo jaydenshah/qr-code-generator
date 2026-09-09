@@ -33,7 +33,11 @@ class QR:
         self._GF: GF256 = GF256(0x11d, 2)
         self._P: Polynomial = Polynomial.fromGaloisField(self._GF)
 
-        self._encode_data()
+        self._data_bytes: list[int] = self._generate_data_bytes()
+        self._ecc: list[int] = self._generate_ecc()
+        self._message_bytes: list[int] = self._data_bytes + self._ecc
+
+        self.matrix = self._generate_matrix()
 
     def _determine_mode(self) -> Mode:
         for char in self.data:
@@ -110,16 +114,119 @@ class QR:
 
         return self._P.mod(message_poly, generator_poly)
 
-    def _encode_data(self) -> None:
-        self._data_bytes: list[int] = self._generate_data_bytes()
-        self._ecc: list[int] = self._generate_ecc()
-        self._sequence: list[int] = self._data_bytes + self._ecc
+    def _generate_format_int(self) -> int:
+        format_int: int = 1
+        format_int <<= 3
+        format_int |= self.mask
+        format_poly: list[int] = [int((format_int << i) & (1 << 4) != 0) for i in range(5)] + [0] * 10
+        generator_poly: list[int] = [1, 0, 1, 0, 0, 1, 1, 0, 1, 1, 1]
+        ecc: list[int] = self._P.mod(format_poly, generator_poly)
+
+        for ecc_bit in ecc:
+            format_int <<= 1
+            format_int |= ecc_bit
+
+        format_int ^= 0b101010000010010
+
+        return format_int
+
+    def _generate_matrix(self) -> list[list[int]]:
+        def draw_square(value: int, top_left: tuple[int, int], bottom_right: tuple[int, int]) -> None:
+            for y in range(top_left[1], bottom_right[1] + 1):
+                for x in range(top_left[0], bottom_right[0] + 1):
+                    matrix[y][x] = value
+
+        def draw_finder_pattern(top_left: tuple[int, int]) -> None:
+            draw_square(1, top_left, (top_left[0] + 6, top_left[1] + 6))
+            draw_square(0, (top_left[0] + 1, top_left[1] + 1), (top_left[0] + 5, top_left[1] + 5))
+            draw_square(1, (top_left[0] + 2, top_left[1] + 2), (top_left[0] + 4, top_left[1] + 4))
+
+        def is_data_bit(coord: tuple[int, int]) -> bool:
+            x: int = coord[0]
+            y: int = coord[1]
+
+            if x == 6 or y == 6:
+                return False
+
+            if x <= 8 and y <= 8:
+                return False
+            if x >= modules_per_side - 8 and y <= 8:
+                return False
+            if x <= 8 and y >= modules_per_side - 8:
+                return False
+
+            return True
+
+        def print_matrix():
+            print("\n\n")
+            for thing in matrix:
+                print("".join(map(lambda x: "██" if x == 1 else "  ", thing)))
+            print("\n\n")
+
+        modules_per_side: int = 17 + 4 * self.version
+        matrix: list[list[int]] = [[0] * modules_per_side for _ in range(modules_per_side)]
+
+        draw_finder_pattern((0, 0))
+        draw_finder_pattern((0, modules_per_side - 7))
+        draw_finder_pattern((modules_per_side - 7, 0))
+
+        for i in range(8, modules_per_side - 8):
+            if i % 2 == 0:
+                matrix[i][6] = 1
+                matrix[6][i] = 1
+
+        message_byte_counter: int = 0
+        bit_counter: int = 0
+        for left_x in list(range(modules_per_side - 2, 6, -2)) + list(range(4, -1, -2)):
+            if (left_x // 2) % 2 == 0:
+                y_range: range = range(0, modules_per_side)
+            else:
+                y_range: range = range(modules_per_side - 1, -1, -1)
+
+            for y in y_range:
+                for x_offset in range(1, -1, -1):
+                    if not is_data_bit((left_x + x_offset, y)):
+                        continue
+
+                    matrix[y][left_x + x_offset] = int((self._message_bytes[message_byte_counter] << bit_counter) & (1 << 7) != 0)
+                    bit_counter = (bit_counter + 1) % 8
+
+                    if bit_counter == 0:
+                        message_byte_counter += 1
+
+        self.mask: int = 0
+        for y in range(modules_per_side):
+            for x in range(modules_per_side):
+                if not is_data_bit((x, y)):
+                    continue
+
+                if (x + y) % 2 == 0:
+                    matrix[y][x] ^= 1
+
+        format_int: int = self._generate_format_int()
+
+        matrix[modules_per_side - 8][8] = 1
+        for i in range(15):
+            bit: int = (format_int >> i) & 1
+            if i in range(0, 6):
+                matrix[i][8] = bit
+            elif i in range(6, 8):
+                matrix[i + 1][8] = bit
+            else:
+                matrix[modules_per_side - 15 + i][8] = bit
+
+        for i in range(15):
+            bit: int = (format_int >> i) & 1
+            if i in range(0, 8):
+                matrix[8][modules_per_side - 1 - i] = bit
+            elif i == 8:
+                matrix[8][7] = bit
+            else:
+                matrix[8][14 - i] = bit
+
+        print_matrix()
+
+        return matrix
         
 
-qr = QR("HELLO WORLD")
-
-
-
-
-        
-        
+qr = QR("GOOGLE.COM")
